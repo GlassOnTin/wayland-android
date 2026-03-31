@@ -1,0 +1,22 @@
+[binaries]
+c = '/home/ian/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang'
+cpp = '/home/ian/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++'
+ar = '/home/ian/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
+strip = '/home/ian/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
+ranlib = '/home/ian/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib'
+pkg-config = '/usr/bin/pkg-config'
+
+[built-in options]
+c_args = ['-I/home/ian/Code/wayland-android-prototype/sysroot/include']
+c_link_args = ['-L/home/ian/Code/wayland-android-prototype/sysroot/lib']
+
+[properties]
+sys_root = '/home/ian/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/sysroot'
+pkg_config_libdir = '/home/ian/Code/wayland-android-prototype/sysroot/lib/pkgconfig:/home/ian/Code/wayland-android-prototype/sysroot/share/pkgconfig'
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'android'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'

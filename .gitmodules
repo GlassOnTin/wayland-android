@@ -1,0 +1,63 @@
+[submodule "wayland"]
+	path = wayland
+	url = https://gitlab.freedesktop.org/wayland/wayland.git
+[submodule "wlroots"]
+	path = wlroots
+	url = https://github.com/GlassOnTin/wlroots.git
+[submodule "labwc"]
+	path = labwc
+	url = https://github.com/GlassOnTin/labwc.git
+[submodule "cairo"]
+	path = cairo
+	url = https://gitlab.freedesktop.org/cairo/cairo.git
+[submodule "pango"]
+	path = pango
+	url = https://gitlab.gnome.org/GNOME/pango.git
+[submodule "harfbuzz"]
+	path = harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "freetype"]
+	path = freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype.git
+[submodule "fontconfig"]
+	path = fontconfig
+	url = https://gitlab.freedesktop.org/fontconfig/fontconfig.git
+[submodule "glib"]
+	path = glib
+	url = https://gitlab.gnome.org/GNOME/glib.git
+[submodule "fribidi"]
+	path = fribidi
+	url = https://github.com/fribidi/fribidi.git
+[submodule "pixman"]
+	path = pixman
+	url = https://gitlab.freedesktop.org/pixman/pixman.git
+[submodule "libdrm"]
+	path = libdrm
+	url = https://gitlab.freedesktop.org/mesa/drm.git
+[submodule "libexpat"]
+	path = libexpat
+	url = https://github.com/libexpat/libexpat.git
+[submodule "libxml2"]
+	path = libxml2
+	url = https://gitlab.gnome.org/GNOME/libxml2.git
+[submodule "libffi"]
+	path = libffi
+	url = https://github.com/libffi/libffi.git
+[submodule "pcre2"]
+	path = pcre2
+	url = https://github.com/PCRE2Project/pcre2.git
+[submodule "libpng"]
+	path = libpng
+	url = https://github.com/pnggroup/libpng.git
+[submodule "libxkbcommon"]
+	path = libxkbcommon
+	url = https://github.com/xkbcommon/libxkbcommon.git
+[submodule "wayland-protocols"]
+	path = wayland-protocols
+	url = https://gitlab.freedesktop.org/wayland/wayland-protocols.git
+[submodule "libevdev"]
+	path = libevdev
+	url = https://gitlab.freedesktop.org/libevdev/libevdev.git
+[submodule "libinput"]
+	path = libinput
+	url = https://gitlab.freedesktop.org/libinput/libinput.git

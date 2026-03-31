@@ -1,0 +1,9 @@
+build/
+sysroot/
+jniLibs/
+*.o
+*.a
+*.so
+# Keep the stub header
+!sysroot/arm64-v8a/include/gbm.h
+wayland-build/
