@@ -119,6 +119,18 @@ static struct wlr_renderer *create_android_gles2_renderer(void) {
 
     LOGI("EGL context created, wrapping in wlroots...");
 
+    /* Log EGL extensions for GPU client capability diagnostics */
+    const char *dpy_exts = eglQueryString(dpy, EGL_EXTENSIONS);
+    if (dpy_exts) {
+        LOGI("EGL display extensions: %s", dpy_exts);
+        LOGI("EGL_EXT_image_dma_buf_import: %s",
+            strstr(dpy_exts, "EGL_EXT_image_dma_buf_import") ? "YES" : "NO");
+        LOGI("EGL_ANDROID_image_native_buffer: %s",
+            strstr(dpy_exts, "EGL_ANDROID_image_native_buffer") ? "YES" : "NO");
+        LOGI("EGL_ANDROID_get_native_client_buffer: %s",
+            strstr(dpy_exts, "EGL_ANDROID_get_native_client_buffer") ? "YES" : "NO");
+    }
+
     struct wlr_egl *egl = wlr_egl_create_with_context(dpy, ctx);
     if (!egl) {
         LOGE("wlr_egl_create_with_context failed");
@@ -809,4 +821,42 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSetSurface(JNIEnv *env, jclass cl
         g_max_surface_h = 0;
     }
     pthread_mutex_unlock(&g_window_lock);
+}
+
+/* ========== Benchmark launcher ========== */
+
+JNIEXPORT void JNICALL
+Java_sh_haven_core_wayland_WaylandBridge_nativeLaunchBenchmark(
+        JNIEnv *env, jclass cls, jstring jBinaryPath) {
+    const char *path = (*env)->GetStringUTFChars(env, jBinaryPath, NULL);
+    if (!path) {
+        LOGE("nativeLaunchBenchmark: null path");
+        return;
+    }
+    LOGI("Launching benchmark: %s", path);
+
+    /* Extract XDG_RUNTIME_DIR from socket path (remove /wayland-0 suffix) */
+    char xdg_dir[256] = "/tmp";
+    if (socket_path_buf[0]) {
+        strncpy(xdg_dir, socket_path_buf, sizeof(xdg_dir) - 1);
+        xdg_dir[sizeof(xdg_dir) - 1] = '\0';
+        char *slash = strrchr(xdg_dir, '/');
+        if (slash) *slash = '\0';
+    }
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* Child: set Wayland env and exec the benchmark */
+        setenv("WAYLAND_DISPLAY", "wayland-0", 1);
+        setenv("XDG_RUNTIME_DIR", xdg_dir, 1);
+        execl(path, path, NULL);
+        LOGE("execl failed: %s", strerror(errno));
+        _exit(1);
+    } else if (pid > 0) {
+        LOGI("Benchmark forked as pid %d", pid);
+    } else {
+        LOGE("fork failed: %s", strerror(errno));
+    }
+
+    (*env)->ReleaseStringUTFChars(env, jBinaryPath, path);
 }
