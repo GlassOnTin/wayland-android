@@ -40,7 +40,6 @@ if [ ! -f "$BUILDDIR/labwc/liblabwc.a" ]; then
         --default-library=static \
         -Dxwayland=disabled -Dsvg=disabled -Dicon=disabled \
         -Dnls=disabled -Dman-pages=disabled \
-        -Dlabnag=disabled \
         -Db_pie=false
     ninja -C "$BUILDDIR/labwc" -j"$(nproc)"
 fi
