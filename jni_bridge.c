@@ -825,14 +825,21 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSetSurface(JNIEnv *env, jclass cl
 
 /* ========== Benchmark launcher ========== */
 
-JNIEXPORT void JNICALL
+static pid_t g_benchmark_pid = -1;
+
+JNIEXPORT jboolean JNICALL
 Java_sh_haven_core_wayland_WaylandBridge_nativeLaunchBenchmark(
         JNIEnv *env, jclass cls, jstring jBinaryPath) {
-    const char *path = (*env)->GetStringUTFChars(env, jBinaryPath, NULL);
-    if (!path) {
-        LOGE("nativeLaunchBenchmark: null path");
-        return;
+    /* Toggle: if running, kill it and return false */
+    if (g_benchmark_pid > 0 && kill(g_benchmark_pid, 0) == 0) {
+        LOGI("Stopping benchmark pid %d", g_benchmark_pid);
+        kill(g_benchmark_pid, SIGTERM);
+        g_benchmark_pid = -1;
+        return JNI_FALSE;
     }
+
+    const char *path = (*env)->GetStringUTFChars(env, jBinaryPath, NULL);
+    if (!path) return JNI_FALSE;
     LOGI("Launching benchmark: %s", path);
 
     /* Extract XDG_RUNTIME_DIR from socket path (remove /wayland-0 suffix) */
@@ -846,19 +853,22 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeLaunchBenchmark(
 
     pid_t pid = fork();
     if (pid == 0) {
-        /* Child: set Wayland env and exec the benchmark */
         setenv("WAYLAND_DISPLAY", "wayland-0", 1);
         setenv("XDG_RUNTIME_DIR", xdg_dir, 1);
         execl(path, path, NULL);
         LOGE("execl failed: %s", strerror(errno));
         _exit(1);
     } else if (pid > 0) {
+        g_benchmark_pid = pid;
         LOGI("Benchmark forked as pid %d", pid);
     } else {
         LOGE("fork failed: %s", strerror(errno));
+        (*env)->ReleaseStringUTFChars(env, jBinaryPath, path);
+        return JNI_FALSE;
     }
 
     (*env)->ReleaseStringUTFChars(env, jBinaryPath, path);
+    return JNI_TRUE;
 }
 
 /* ========== virgl_test_server launcher ========== */
