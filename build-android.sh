@@ -44,6 +44,19 @@ mkdir -p "$PREFIX"/{lib/pkgconfig,share/pkgconfig,include} "$BUILDDIR"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
 export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
 
+# Synthetic zlib.pc — Android NDK always includes libz but no pkg-config file.
+# libpng's .pc references zlib, so meson needs to find it.
+cat > "$PREFIX/lib/pkgconfig/zlib.pc" <<ZLIBPC
+prefix=$TOOLCHAIN/sysroot/usr
+libdir=\${prefix}/lib/${ARCH_TRIPLE}${API_LEVEL}
+includedir=\${prefix}/include
+Name: zlib
+Description: zlib compression library (Android NDK)
+Version: 1.3
+Libs: -L\${libdir} -lz
+Cflags: -I\${includedir}
+ZLIBPC
+
 # Generate Meson cross-file
 CROSSFILE="$BUILDDIR/cross.txt"
 cat > "$CROSSFILE" <<CROSS
