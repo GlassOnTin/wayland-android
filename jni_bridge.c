@@ -895,8 +895,12 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeStartVirglServer(
 
     pid_t pid = fork();
     if (pid == 0) {
-        /* Child: exec virgl_test_server with socket path */
-        execl(path, path, "--socket-path", sock, "--no-fork", NULL);
+        /* Child: ensure EGL/GLES2 are discoverable by the dynamic linker.
+         * The app process has them via the runtime linker namespace, but
+         * execl replaces the process image and loses that namespace. */
+        setenv("LD_LIBRARY_PATH", "/system/lib64", 1);
+        execl(path, path, "--use-egl-surfaceless", "--use-gles",
+              "--socket-path", sock, "--no-fork", NULL);
         LOGE("execl virgl_test_server failed: %s", strerror(errno));
         _exit(1);
     } else if (pid > 0) {
