@@ -46,7 +46,7 @@ if [ ! -f "$BUILDDIR/labwc/liblabwc.a" ]; then
         --cross-file "$CROSSFILE" \
         --prefix="$SYSROOT" \
         --default-library=static \
-        -Dxwayland=disabled -Dsvg=disabled -Dicon=disabled \
+        -Dxwayland=enabled -Dsvg=disabled -Dicon=disabled \
         -Dnls=disabled -Dman-pages=disabled \
         -Db_pie=false
     ninja -C "$BUILDDIR/labwc" -j"$(nproc)"
@@ -89,7 +89,7 @@ if [ ! -f "$SYSROOT/lib/libwlroots-0.19.a" ]; then
         --prefix="$SYSROOT" \
         --default-library=static \
         -Dbackends=[] -Drenderers=gles2 -Dallocators=[] \
-        -Dexamples=false -Dxwayland=disabled -Dsession=disabled \
+        -Dexamples=false -Dxwayland=enabled -Dsession=disabled \
         -Dcolor-management=disabled -Dlibliftoff=disabled \
         -Dxcb-errors=disabled -Dwerror=false
     ninja -C "$BUILDDIR/wlroots" -j"$(nproc)"

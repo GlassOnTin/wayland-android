@@ -36,6 +36,14 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+/* Android bionic uses __assert2, not __assert_fail (glibc/musl).
+ * libxcb's assert() calls expand to __assert_fail when cross-compiled
+ * with autotools targeting linux-android. Provide a shim. */
+void __assert_fail(const char *expr, const char *file, unsigned int line, const char *func) {
+    __android_log_print(ANDROID_LOG_FATAL, LOG_TAG, "ASSERT FAILED: %s (%s:%u %s)", expr, file, line, func);
+    abort();
+}
+
 /* labwc headers */
 #include <time.h>
 #include "labwc.h"
@@ -489,6 +497,10 @@ static void *compositor_main(void *arg) {
     g_input_write = 0;
 
     wlr_log_init(WLR_DEBUG, android_wlr_log);
+
+    const char *xw_path = getenv("WLR_XWAYLAND");
+    LOGI("WLR_XWAYLAND=%s", xw_path ? xw_path : "(null)");
+
     session_environment_init();
     rcxml_read(NULL); /* default config */
 

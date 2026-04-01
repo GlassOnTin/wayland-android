@@ -312,6 +312,89 @@ build_pango() {
         -Dintrospection=disabled -Dgtk_doc=false
 }
 
+# ---- xcb-proto (data files only — protocol XML definitions) ----
+build_xcb_proto() {
+    echo "--- xcb-proto ---"
+    mkdir -p "$PREFIX/share/xcb" "$PREFIX/lib/pkgconfig"
+    cp "$SCRIPT_DIR/xcb-proto/src/"*.xml "$PREFIX/share/xcb/"
+    # Create pkg-config file so libxcb can find the protocol defs
+    cat > "$PREFIX/lib/pkgconfig/xcb-proto.pc" <<XCBPC
+prefix=$PREFIX
+datarootdir=\${prefix}/share
+xcbincludedir=\${datarootdir}/xcb
+pythondir=\${datarootdir}/xcb
+Name: XCB Proto
+Description: X protocol C binding protocol descriptions
+Version: 1.17.0
+XCBPC
+}
+
+# ---- libXau (Meson) ----
+build_libxau() {
+    meson_android libxau "$SCRIPT_DIR/libxau" \
+        -Dtests=false
+}
+
+# ---- libXdmcp (autotools) ----
+build_libxdmcp() {
+    echo "--- libXdmcp ---"
+    cd "$SCRIPT_DIR/libxdmcp"
+    [ -f configure ] || autoreconf -fi
+    rm -rf "$BUILDDIR/libxdmcp"
+    mkdir -p "$BUILDDIR/libxdmcp"
+    cd "$BUILDDIR/libxdmcp"
+    CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" CFLAGS="-fPIC -I$PREFIX/include" \
+    LDFLAGS="-L$PREFIX/lib" PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
+        "$SCRIPT_DIR/libxdmcp/configure" \
+        --host="$ARCH_TRIPLE" \
+        --prefix="$PREFIX" \
+        --disable-shared --enable-static --disable-docs
+    make -j"$(nproc)"
+    make install
+}
+
+# ---- libxcb (autotools) ----
+build_libxcb() {
+    echo "--- libxcb ---"
+    cd "$SCRIPT_DIR/libxcb"
+    [ -f configure ] || autoreconf -fi
+    rm -rf "$BUILDDIR/libxcb"
+    mkdir -p "$BUILDDIR/libxcb"
+    cd "$BUILDDIR/libxcb"
+    CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
+    CFLAGS="-fPIC -I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
+    PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
+    PYTHON=python3 \
+        "$SCRIPT_DIR/libxcb/configure" \
+        --host="$ARCH_TRIPLE" \
+        --prefix="$PREFIX" \
+        --disable-shared --enable-static \
+        --enable-composite --enable-render --enable-res --enable-xfixes \
+        --enable-ewmh --enable-icccm \
+        --disable-selinux --disable-devel-docs
+    make -j"$(nproc)"
+    make install
+}
+
+# ---- xcb-util-wm (autotools — provides ewmh + icccm) ----
+build_xcb_util_wm() {
+    echo "--- xcb-util-wm ---"
+    cd "$SCRIPT_DIR/xcb-util-wm"
+    [ -f configure ] || autoreconf -fi
+    rm -rf "$BUILDDIR/xcb-util-wm"
+    mkdir -p "$BUILDDIR/xcb-util-wm"
+    cd "$BUILDDIR/xcb-util-wm"
+    CC="$CC" AR="$AR" RANLIB="$RANLIB" STRIP="$STRIP" \
+    CFLAGS="-fPIC -I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
+    PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
+        "$SCRIPT_DIR/xcb-util-wm/configure" \
+        --host="$ARCH_TRIPLE" \
+        --prefix="$PREFIX" \
+        --disable-shared --enable-static
+    make -j"$(nproc)"
+    make install
+}
+
 # Execute all builds
 build_libffi
 build_expat
@@ -321,6 +404,13 @@ build_pixman
 build_xkbcommon
 build_libdrm
 
+# XCB libraries (required for XWayland support in wlroots/labwc)
+build_xcb_proto
+build_libxau
+build_libxdmcp
+build_libxcb
+build_xcb_util_wm
+
 # wlroots (uses GlassOnTin/wlroots fork with Android patches)
 echo "--- wlroots ---"
 rm -rf "$BUILDDIR/wlroots"
@@ -329,7 +419,7 @@ meson setup "$BUILDDIR/wlroots" "$SCRIPT_DIR/wlroots" \
     --prefix="$PREFIX" \
     --default-library=static \
     -Dbackends=[] -Drenderers=[] -Dallocators=[] \
-    -Dexamples=false -Dxwayland=disabled -Dsession=disabled \
+    -Dexamples=false -Dxwayland=enabled -Dsession=disabled \
     -Dcolor-management=disabled -Dlibliftoff=disabled \
     -Dxcb-errors=disabled -Dwerror=false
 ninja -C "$BUILDDIR/wlroots" -j"$(nproc)"

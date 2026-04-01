@@ -67,3 +67,21 @@
 [submodule "virglrenderer"]
 	path = virglrenderer
 	url = https://github.com/GlassOnTin/virglrenderer.git
+[submodule "xcb-proto"]
+	path = xcb-proto
+	url = https://gitlab.freedesktop.org/xorg/proto/xcbproto.git
+[submodule "libxcb"]
+	path = libxcb
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb.git
+[submodule "libxau"]
+	path = libxau
+	url = https://gitlab.freedesktop.org/xorg/lib/libXau.git
+[submodule "libxdmcp"]
+	path = libxdmcp
+	url = https://gitlab.freedesktop.org/xorg/lib/libXdmcp.git
+[submodule "xcb-util-wm"]
+	path = xcb-util-wm
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-wm.git
+[submodule "xorgproto"]
+	path = xorgproto
+	url = https://gitlab.freedesktop.org/xorg/proto/xorgproto.git
