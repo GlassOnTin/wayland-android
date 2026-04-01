@@ -30,6 +30,14 @@ NDK_SYSROOT="$TOOLCHAIN/sysroot"
 echo "=== Building labwc for $ABI ==="
 
 # Build labwc if not already built
+# Install wlroots backend headers that labwc includes but we don't build.
+# (We use -Dbackends=[] but labwc #includes the headers for type defs.)
+mkdir -p "$SYSROOT/include/wlr/backend"
+for hdr in drm.h wayland.h headless.h multi.h; do
+    src="$SCRIPT_DIR/wlroots/include/wlr/backend/$hdr"
+    [ -f "$src" ] && cp "$src" "$SYSROOT/include/wlr/backend/"
+done
+
 if [ ! -f "$BUILDDIR/labwc/liblabwc.a" ]; then
     echo "--- labwc (Meson) ---"
     CROSSFILE="$BUILDDIR/cross.txt"
