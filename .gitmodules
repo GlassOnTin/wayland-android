@@ -61,3 +61,9 @@
 [submodule "libinput"]
 	path = libinput
 	url = https://gitlab.freedesktop.org/libinput/libinput.git
+[submodule "libepoxy"]
+	path = libepoxy
+	url = https://github.com/anholt/libepoxy.git
+[submodule "virglrenderer"]
+	path = virglrenderer
+	url = https://gitlab.freedesktop.org/virgl/virglrenderer.git

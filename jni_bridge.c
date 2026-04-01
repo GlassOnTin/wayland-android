@@ -860,3 +860,62 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeLaunchBenchmark(
 
     (*env)->ReleaseStringUTFChars(env, jBinaryPath, path);
 }
+
+/* ========== virgl_test_server launcher ========== */
+
+static pid_t g_virgl_pid = -1;
+
+JNIEXPORT void JNICALL
+Java_sh_haven_core_wayland_WaylandBridge_nativeStartVirglServer(
+        JNIEnv *env, jclass cls, jstring jBinaryPath, jstring jSocketPath) {
+    if (g_virgl_pid > 0) {
+        LOGI("virgl_test_server already running (pid %d)", g_virgl_pid);
+        return;
+    }
+
+    const char *path = (*env)->GetStringUTFChars(env, jBinaryPath, NULL);
+    const char *sock = (*env)->GetStringUTFChars(env, jSocketPath, NULL);
+    if (!path || !sock) {
+        LOGE("nativeStartVirglServer: null args");
+        if (path) (*env)->ReleaseStringUTFChars(env, jBinaryPath, path);
+        if (sock) (*env)->ReleaseStringUTFChars(env, jSocketPath, sock);
+        return;
+    }
+    LOGI("Starting virgl_test_server: %s socket=%s", path, sock);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* Child: exec virgl_test_server with socket path */
+        execl(path, path, "--socket-path", sock, "--no-fork", NULL);
+        LOGE("execl virgl_test_server failed: %s", strerror(errno));
+        _exit(1);
+    } else if (pid > 0) {
+        g_virgl_pid = pid;
+        LOGI("virgl_test_server forked as pid %d", pid);
+    } else {
+        LOGE("fork failed: %s", strerror(errno));
+    }
+
+    (*env)->ReleaseStringUTFChars(env, jBinaryPath, path);
+    (*env)->ReleaseStringUTFChars(env, jSocketPath, sock);
+}
+
+JNIEXPORT void JNICALL
+Java_sh_haven_core_wayland_WaylandBridge_nativeStopVirglServer(
+        JNIEnv *env, jclass cls) {
+    if (g_virgl_pid > 0) {
+        LOGI("Stopping virgl_test_server pid %d", g_virgl_pid);
+        kill(g_virgl_pid, SIGTERM);
+        g_virgl_pid = -1;
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_sh_haven_core_wayland_WaylandBridge_nativeIsVirglRunning(
+        JNIEnv *env, jclass cls) {
+    if (g_virgl_pid <= 0) return JNI_FALSE;
+    /* Check if process is still alive */
+    if (kill(g_virgl_pid, 0) == 0) return JNI_TRUE;
+    g_virgl_pid = -1;
+    return JNI_FALSE;
+}
