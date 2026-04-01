@@ -28,6 +28,7 @@
 #include "render/allocator/shm.h" /* for wlr_shm_allocator_create */
 #include "ahb_allocator.h"
 #include "buffer_presenter.h"
+#include "config/rcxml.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <wayland-server-core.h>
@@ -504,6 +505,15 @@ static void *compositor_main(void *arg) {
     session_environment_init();
     rcxml_read(NULL); /* default config */
 
+    /* Force non-lazy XWayland startup on Android. Without this, XWayland
+     * only starts when an X11 client connects — but the PRoot terminal
+     * waits for the X socket first (chicken-and-egg). */
+    {
+        extern struct rcxml rc;
+        rc.xwayland_persistence = true;
+        LOGI("Forced xwayland_persistence=true (non-lazy)");
+    }
+
     /* Try GPU path: GLES2 renderer + AHardwareBuffer allocator */
     android_renderer = create_android_gles2_renderer();
     if (android_renderer) {
@@ -632,6 +642,22 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeStart(
     setenv("XDG_RUNTIME_DIR", xdgDir, 1);
     setenv("XKB_CONFIG_ROOT", xkbRoot, 1);
     setenv("FONTCONFIG_FILE", fontConf, 1);
+    /* TMPDIR: Android has no /tmp. wlroots XWayland sockets use TMPDIR
+     * to find .X11-unix/. Point to the parent of XDG dir (the app cache)
+     * which PRoot also maps as /tmp inside the guest. */
+    {
+        char tmpdir[256];
+        strncpy(tmpdir, xdgDir, sizeof(tmpdir) - 1);
+        tmpdir[sizeof(tmpdir) - 1] = '\0';
+        char *slash = strrchr(tmpdir, '/');
+        if (slash) *slash = '\0'; /* cache/wayland-xdg → cache */
+        setenv("TMPDIR", tmpdir, 1);
+        LOGI("TMPDIR=%s", tmpdir);
+        /* Create .X11-unix dir for XWayland sockets */
+        char x11dir[280];
+        snprintf(x11dir, sizeof(x11dir), "%s/.X11-unix", tmpdir);
+        mkdir(x11dir, 0755);
+    }
     setenv("WLR_BACKENDS", "headless", 1);
     setenv("WLR_LIBINPUT_NO_DEVICES", "1", 1);
     setenv("LIBSEAT_BACKEND", "noop", 1);
