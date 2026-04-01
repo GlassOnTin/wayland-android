@@ -66,4 +66,4 @@
 	url = https://github.com/anholt/libepoxy.git
 [submodule "virglrenderer"]
 	path = virglrenderer
-	url = https://gitlab.freedesktop.org/virgl/virglrenderer.git
+	url = https://github.com/GlassOnTin/virglrenderer.git
