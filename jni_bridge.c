@@ -18,6 +18,7 @@
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_pointer.h>
+#include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_keyboard_group.h>
 #include <xkbcommon/xkbcommon.h>
 #include <wlr/types/wlr_scene.h>
@@ -439,14 +440,26 @@ static int frame_timer_cb(void *data) {
             wlr_seat_pointer_notify_frame(server.seat.wlr_seat);
             break;
         }
-        case INPUT_KEY:
-            LOGI("Key event: code=%u pressed=%d focused=%p",
-                 ev.code, ev.pressed,
-                 server.seat.wlr_seat->keyboard_state.focused_surface);
+        case INPUT_KEY: {
+            struct wlr_keyboard *kb = &server.seat.keyboard_group->keyboard;
+            /* Update xkb state so modifiers (Ctrl, Shift, Alt) are tracked.
+             * xkb keycodes are evdev + 8. */
+            xkb_state_update_key(kb->xkb_state, ev.code + 8,
+                ev.pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
+            /* Send the key event to the focused client */
             wlr_seat_keyboard_notify_key(server.seat.wlr_seat,
                 now, ev.code, ev.pressed ? WL_KEYBOARD_KEY_STATE_PRESSED
                                          : WL_KEYBOARD_KEY_STATE_RELEASED);
+            /* Send updated modifiers after every key (handles Ctrl, Shift, etc.) */
+            wlr_seat_keyboard_notify_modifiers(server.seat.wlr_seat,
+                &(struct wlr_keyboard_modifiers){
+                    .depressed = xkb_state_serialize_mods(kb->xkb_state, XKB_STATE_MODS_DEPRESSED),
+                    .latched = xkb_state_serialize_mods(kb->xkb_state, XKB_STATE_MODS_LATCHED),
+                    .locked = xkb_state_serialize_mods(kb->xkb_state, XKB_STATE_MODS_LOCKED),
+                    .group = xkb_state_serialize_layout(kb->xkb_state, XKB_STATE_LAYOUT_EFFECTIVE),
+                });
             break;
+        }
         default:
             break;
         }
