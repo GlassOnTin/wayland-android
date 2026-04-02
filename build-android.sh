@@ -5,7 +5,8 @@ set -euo pipefail
 # Designed to run on F-Droid buildserver (Debian) or local Linux host
 #
 # Prerequisites (F-Droid sudo block):
-#   apt-get install -y meson ninja-build pkg-config libexpat1-dev libffi-dev
+#   apt-get install -y meson ninja-build pkg-config libexpat1-dev libffi-dev \
+#       automake autoconf libtool libtool-bin libwayland-dev python3 bison g++
 #
 # Environment:
 #   ANDROID_NDK_HOME — path to NDK r28+
