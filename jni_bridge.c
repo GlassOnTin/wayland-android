@@ -302,9 +302,9 @@ static volatile int g_zoom_permille = 1000;
 /* Input event queue (JNI thread → compositor thread) */
 #define INPUT_QUEUE_SIZE 256
 struct input_event {
-    enum { INPUT_NONE, INPUT_MOTION, INPUT_BUTTON, INPUT_KEY } type;
-    double x, y;        /* for motion: absolute coords 0..1 */
-    uint32_t code;      /* button or keycode */
+    enum { INPUT_NONE, INPUT_MOTION, INPUT_BUTTON, INPUT_KEY, INPUT_SCROLL } type;
+    double x, y;        /* for motion: absolute coords 0..1; for scroll: axis value */
+    uint32_t code;      /* button or keycode; for scroll: axis (0=vert, 1=horiz) */
     int pressed;         /* 1=press, 0=release */
 };
 static struct input_event g_input_queue[INPUT_QUEUE_SIZE];
@@ -458,6 +458,17 @@ static int frame_timer_cb(void *data) {
                     .locked = xkb_state_serialize_mods(kb->xkb_state, XKB_STATE_MODS_LOCKED),
                     .group = xkb_state_serialize_layout(kb->xkb_state, XKB_STATE_LAYOUT_EFFECTIVE),
                 });
+            break;
+        }
+        case INPUT_SCROLL: {
+            uint32_t axis = ev.code; /* 0=vertical, 1=horizontal */
+            double value = ev.x;    /* positive = down/right */
+            wlr_seat_pointer_notify_axis(server.seat.wlr_seat,
+                now, axis, value,
+                (int32_t)(value * 120), /* discrete: 120 units per notch */
+                WL_POINTER_AXIS_SOURCE_FINGER,
+                WL_POINTER_AXIS_RELATIVE_DIRECTION_IDENTICAL);
+            wlr_seat_pointer_notify_frame(server.seat.wlr_seat);
             break;
         }
         default:
@@ -756,6 +767,15 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSendKey(
     (void)env; (void)cls;
     queue_input((struct input_event){
         .type = INPUT_KEY, .code = (uint32_t)linuxKeyCode, .pressed = pressed });
+}
+
+JNIEXPORT void JNICALL
+Java_sh_haven_core_wayland_WaylandBridge_nativeSendScroll(
+    JNIEnv *env, jclass cls, jint axis, jfloat value)
+{
+    (void)env; (void)cls;
+    queue_input((struct input_event){
+        .type = INPUT_SCROLL, .x = (double)value, .code = (uint32_t)axis });
 }
 
 JNIEXPORT void JNICALL
