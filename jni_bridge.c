@@ -303,7 +303,7 @@ static volatile int g_zoom_permille = 1000;
 #define INPUT_QUEUE_SIZE 256
 struct input_event {
     enum { INPUT_NONE, INPUT_MOTION, INPUT_BUTTON, INPUT_KEY, INPUT_SCROLL } type;
-    double x, y;        /* for motion: absolute coords 0..1; for scroll: axis value */
+    double x, y;        /* for motion: normalized 0..1; for scroll: axis value */
     uint32_t code;      /* button or keycode; for scroll: axis (0=vert, 1=horiz) */
     int pressed;         /* 1=press, 0=release */
 };
@@ -406,9 +406,17 @@ static int frame_timer_cb(void *data) {
         switch (ev.type) {
         case INPUT_MOTION: {
             wlr_cursor_warp_absolute(server.seat.cursor, NULL, ev.x, ev.y);
-            cursor_update_focus();
-            wlr_seat_pointer_notify_motion(server.seat.wlr_seat,
-                now, server.seat.cursor->x, server.seat.cursor->y);
+            /* Use labwc's proper motion handler which returns
+             * surface-local coordinates.  Previously we passed
+             * absolute layout coords to pointer_notify_motion,
+             * so surfaces not at the origin (e.g. waybar panel)
+             * received coordinates far outside their bounds. */
+            double sx, sy;
+            bool notify_motion = cursor_process_motion(now, &sx, &sy);
+            if (notify_motion) {
+                wlr_seat_pointer_notify_motion(server.seat.wlr_seat,
+                    now, sx, sy);
+            }
             wlr_seat_pointer_notify_frame(server.seat.wlr_seat);
             static int motion_log = 0;
             if (motion_log++ % 5 == 0)
@@ -755,6 +763,12 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSendTouch(
         queue_input((struct input_event){
             .type = INPUT_BUTTON, .code = 0x110, .pressed = 1 }); /* BTN_LEFT */
     } else if (action == 1) { /* UP */
+        /* Send motion to final position before releasing button.
+         * Android ACTION_UP carries valid coordinates that may differ
+         * from the last MOVE — without this, drags end at the wrong
+         * position and quick taps with slight movement misfire. */
+        queue_input((struct input_event){
+            .type = INPUT_MOTION, .x = x, .y = y });
         queue_input((struct input_event){
             .type = INPUT_BUTTON, .code = 0x110, .pressed = 0 });
     }
