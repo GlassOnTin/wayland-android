@@ -329,6 +329,25 @@ Version: 1.17.0
 XCBPC
 }
 
+# ---- xorgproto (header-only X protocol definitions) ----
+build_xorgproto() {
+    echo "--- xorgproto ---"
+    mkdir -p "$PREFIX/include/X11" "$PREFIX/lib/pkgconfig" "$PREFIX/share/pkgconfig"
+    # Copy essential X11 protocol headers
+    cp -r "$SCRIPT_DIR/xorgproto/include/X11/"* "$PREFIX/include/X11/"
+    # Create xproto.pc (needed by libXau)
+    cat > "$PREFIX/share/pkgconfig/xproto.pc" <<XPPC
+prefix=$PREFIX
+includedir=\${prefix}/include
+Name: Xproto
+Description: Xproto headers
+Version: 7.0.33
+Cflags: -I\${includedir}
+XPPC
+    # Symlink so pkg-config finds it in either location
+    ln -sf "$PREFIX/share/pkgconfig/xproto.pc" "$PREFIX/lib/pkgconfig/xproto.pc"
+}
+
 # ---- libXau (Meson) ----
 build_libxau() {
     meson_android libxau "$SCRIPT_DIR/libxau"
@@ -405,6 +424,7 @@ build_libdrm
 
 # XCB libraries (required for XWayland support in wlroots/labwc)
 build_xcb_proto
+build_xorgproto
 build_libxau
 build_libxdmcp
 build_libxcb
