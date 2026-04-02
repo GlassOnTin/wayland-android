@@ -30,10 +30,22 @@ NDK_SYSROOT="$TOOLCHAIN/sysroot"
 echo "=== Building labwc for $ABI ==="
 
 # Build labwc if not already built
-# Install wlroots backend headers that labwc includes but we don't build.
+# Install wlroots backend/type headers that labwc includes but we don't build.
 # (We use -Dbackends=[] but labwc #includes the headers for type defs.)
+WLR_INC="$SYSROOT/include/wlroots-0.19/wlr"
+mkdir -p "$WLR_INC/backend" "$WLR_INC/types"
+for hdr in drm.h wayland.h headless.h multi.h libinput.h session.h x11.h; do
+    src="$SCRIPT_DIR/wlroots/include/wlr/backend/$hdr"
+    [ -f "$src" ] && cp "$src" "$WLR_INC/backend/"
+done
+# DRM lease header used by labwc server.c
+for hdr in wlr_drm_lease_v1.h; do
+    src="$SCRIPT_DIR/wlroots/include/wlr/types/$hdr"
+    [ -f "$src" ] && cp "$src" "$WLR_INC/types/"
+done
+# Also copy to legacy path for build-labwc.sh JNI includes
 mkdir -p "$SYSROOT/include/wlr/backend"
-for hdr in drm.h wayland.h headless.h multi.h; do
+for hdr in drm.h wayland.h headless.h multi.h libinput.h session.h x11.h; do
     src="$SCRIPT_DIR/wlroots/include/wlr/backend/$hdr"
     [ -f "$src" ] && cp "$src" "$SYSROOT/include/wlr/backend/"
 done

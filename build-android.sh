@@ -429,6 +429,13 @@ M4EOF
         --disable-shared --enable-static
     make -j"$(nproc)"
     make install
+    # The m4-generated xcb_ewmh.h may be empty when out-of-tree build can't
+    # find the source atomlist.m4. Regenerate from source dir if needed.
+    if [ ! -s "$PREFIX/include/xcb/xcb_ewmh.h" ]; then
+        echo "  Regenerating xcb_ewmh.h from m4 template..."
+        m4 -I"$SCRIPT_DIR/xcb-util-wm/ewmh" "$SCRIPT_DIR/xcb-util-wm/ewmh/xcb_ewmh.h.m4" \
+            > "$PREFIX/include/xcb/xcb_ewmh.h"
+    fi
 }
 
 # Execute all builds
@@ -447,6 +454,20 @@ build_libxau
 build_libxdmcp
 build_libxcb
 build_xcb_util_wm
+
+# Synthetic xwayland.pc — wlroots needs this to enable XWayland support.
+# At runtime, the Xwayland binary is provided via PRoot, not from the NDK.
+# Variables are queried by wlroots/xwayland/meson.build for feature detection.
+cat > "$PREFIX/lib/pkgconfig/xwayland.pc" <<XWPC
+Name: Xwayland
+Description: X Server for Wayland (stub for cross-compilation)
+Version: 24.1.0
+xwayland=/usr/bin/Xwayland
+have_listenfd=true
+have_no_touch_pointer_emulation=true
+have_force_xrandr_emulation=true
+have_terminate_delay=true
+XWPC
 
 # wlroots (uses GlassOnTin/wlroots fork with Android patches)
 echo "--- wlroots ---"
