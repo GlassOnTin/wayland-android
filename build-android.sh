@@ -331,8 +331,7 @@ XCBPC
 
 # ---- libXau (Meson) ----
 build_libxau() {
-    meson_android libxau "$SCRIPT_DIR/libxau" \
-        -Dtests=false
+    meson_android libxau "$SCRIPT_DIR/libxau"
 }
 
 # ---- libXdmcp (autotools) ----
