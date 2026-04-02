@@ -146,6 +146,11 @@ $CC -shared -o "$SCRIPT_DIR/jniLibs/$ABI/liblabwc_android.so" \
   "$SYSROOT/lib/libgobject-2.0.a" "$SYSROOT/lib/libgio-2.0.a" "$SYSROOT/lib/libgmodule-2.0.a" \
   "$SYSROOT/lib/libgthread-2.0.a" "$SYSROOT/lib/libffi.a" "$SYSROOT/lib/libintl.a" \
   "$SYSROOT/lib/libpcre2-8.a" "$SYSROOT/lib/libwayland-client.a" \
+  "$SYSROOT/lib/libxcb.a" "$SYSROOT/lib/libxcb-composite.a" \
+  "$SYSROOT/lib/libxcb-ewmh.a" "$SYSROOT/lib/libxcb-icccm.a" \
+  "$SYSROOT/lib/libxcb-render.a" "$SYSROOT/lib/libxcb-res.a" \
+  "$SYSROOT/lib/libxcb-xfixes.a" "$SYSROOT/lib/libxcb-shm.a" \
+  "$SYSROOT/lib/libXau.a" "$SYSROOT/lib/libXdmcp.a" \
   "$SYSROOT/lib/libandroid_stubs.a" \
   -llog -landroid -lm -lz -lEGL -lGLESv2 -lnativewindow
 
