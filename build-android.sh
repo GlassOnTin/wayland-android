@@ -398,7 +398,24 @@ build_libxcb() {
 build_xcb_util_wm() {
     echo "--- xcb-util-wm ---"
     cd "$SCRIPT_DIR/xcb-util-wm"
-    [ -f configure ] || autoreconf -fi
+    # The m4/ submodule (xcb-util-m4) provides XCB_UTIL_COMMON but may not be
+    # checked out. Create a minimal version so autoreconf can generate configure.
+    mkdir -p m4
+    cat > m4/xcb_util.m4 << 'M4EOF'
+dnl Minimal XCB_UTIL_COMMON — just checks for xcb and sets install dirs.
+AC_DEFUN([XCB_UTIL_COMMON],[
+    AC_REQUIRE([AC_PROG_CC])
+    AC_REQUIRE([AC_PROG_INSTALL])
+    AC_REQUIRE([LT_INIT])
+    PKG_CHECK_MODULES(XCB, xcb >= $2)
+    xcbincludedir='${includedir}/xcb'
+    AC_SUBST(xcbincludedir)
+    pkgconfigdir='${libdir}/pkgconfig'
+    AC_SUBST(pkgconfigdir)
+])
+AC_DEFUN([XCB_UTIL_M4_WITH_INCLUDE_PATH],[])
+M4EOF
+    autoreconf -fi
     rm -rf "$BUILDDIR/xcb-util-wm"
     mkdir -p "$BUILDDIR/xcb-util-wm"
     cd "$BUILDDIR/xcb-util-wm"
