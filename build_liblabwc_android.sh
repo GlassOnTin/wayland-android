@@ -24,7 +24,15 @@ echo "=== Building liblabwc_android.so for $ABI ==="
 bash "$SCRIPT_DIR/build-android.sh"
 
 # Step 2: Generate Android stubs for libinput/DRM symbols unused on Android
-NDK="${ANDROID_NDK_HOME:-${ANDROID_SDK_ROOT:-/home/ian/Android/Sdk}/ndk/28.2.13676358}"
+# Auto-detect NDK: ANDROID_NDK_HOME > newest under ANDROID_HOME/ndk/ > newest under ANDROID_SDK_ROOT/ndk/
+if [ -z "${ANDROID_NDK_HOME:-}" ]; then
+    SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+    if [ -n "$SDK" ] && [ -d "$SDK/ndk" ]; then
+        ANDROID_NDK_HOME="$(ls -d "$SDK/ndk"/*/ 2>/dev/null | sort -V | tail -1)"
+        ANDROID_NDK_HOME="${ANDROID_NDK_HOME%/}"
+    fi
+fi
+NDK="${ANDROID_NDK_HOME:?ANDROID_NDK_HOME must be set or an NDK must exist under ANDROID_HOME/ndk/}"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
 PREFIX="$SCRIPT_DIR/sysroot/$ABI"
 

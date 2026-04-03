@@ -9,7 +9,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ABI="${1:-arm64-v8a}"
 
-NDK="${ANDROID_NDK_HOME:-${ANDROID_SDK_ROOT:-/home/ian/Android/Sdk}/ndk/28.2.13676358}"
+# Resolve NDK (inherited from build_liblabwc_android.sh or auto-detect)
+if [ -z "${ANDROID_NDK_HOME:-}" ]; then
+    SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+    if [ -n "$SDK" ] && [ -d "$SDK/ndk" ]; then
+        export ANDROID_NDK_HOME="$(ls -d "$SDK/ndk"/*/ 2>/dev/null | sort -V | tail -1)"
+        ANDROID_NDK_HOME="${ANDROID_NDK_HOME%/}"
+    fi
+fi
+NDK="${ANDROID_NDK_HOME:?ANDROID_NDK_HOME must be set}"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
 
 if [ "$ABI" = "arm64-v8a" ]; then
