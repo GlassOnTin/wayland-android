@@ -163,6 +163,7 @@ static struct wlr_renderer *create_android_gles2_renderer(void) {
 /* Keyboard focus tracking — reset in compositor_main() */
 static bool focus_sent = false;
 static int focus_log_count = 0;
+static struct view *last_front_view = NULL;
 
 /* ANativeWindow for rendering output to screen */
 static ANativeWindow *g_window = NULL;
@@ -318,6 +319,14 @@ static void queue_input(struct input_event ev) {
     g_input_write = next;
 }
 
+/* Deferred button press — delayed by a few frame ticks so the client
+ * processes pointer_enter + motion (hover) before receiving the click.
+ * Touch has no hover phase, but Wayland clients like fuzzel need motion
+ * events to highlight items before a click can activate them. */
+static volatile int g_deferred_button_countdown = 0;
+static struct input_event g_deferred_button;
+static double g_deferred_motion_x, g_deferred_motion_y;
+
 static int frame_timer_cb(void *data) {
     (void)data;
 
@@ -366,35 +375,78 @@ static int frame_timer_cb(void *data) {
         }
     }
 
-    /* Auto-maximize new views and ensure keyboard focus */
+    /* Auto-maximize all views and raise newly appeared ones to front */
     {
         struct wlr_keyboard *kb = wlr_seat_get_keyboard(server.seat.wlr_seat);
+        struct view *front_view = NULL;
         struct view *view;
         wl_list_for_each(view, &server.views, link) {
-            if (view->mapped && view->surface) {
-                /* Auto-maximize and unminimize — on mobile there's
-                 * no taskbar to restore minimized windows. */
-                if (view->minimized) {
-                    view_minimize(view, false);
-                    LOGI("View unminimized");
-                }
-                if (view->maximized != VIEW_AXIS_BOTH) {
-                    view_maximize(view, VIEW_AXIS_BOTH);
-                    LOGI("View auto-maximized");
-                }
-                /* Send keyboard focus on first mapped view */
-                if (kb && !focus_sent) {
-                    wlr_seat_keyboard_notify_enter(server.seat.wlr_seat,
-                        view->surface, kb->keycodes, kb->num_keycodes, &kb->modifiers);
-                    focus_sent = true;
-                    LOGI("Keyboard focus enter sent: surface=%p", view->surface);
-                }
-                break;
+            if (!view->mapped || !view->surface) {
+                continue;
+            }
+            if (!front_view) {
+                front_view = view;
+            }
+            /* Auto-maximize and unminimize — on mobile there's
+             * no taskbar to restore minimized windows. */
+            if (view->minimized) {
+                view_minimize(view, false);
+                LOGI("View unminimized");
+            }
+            if (view->maximized != VIEW_AXIS_BOTH) {
+                view_maximize(view, VIEW_AXIS_BOTH);
+                LOGI("View auto-maximized");
             }
         }
+        /* Raise newly appeared front view and give it keyboard focus */
+        if (front_view && front_view != last_front_view) {
+            view_move_to_front(front_view);
+            if (kb) {
+                wlr_seat_keyboard_notify_enter(server.seat.wlr_seat,
+                    front_view->surface, kb->keycodes, kb->num_keycodes,
+                    &kb->modifiers);
+            }
+            if (last_front_view) {
+                LOGI("New view raised to front: %p", front_view->surface);
+            } else {
+                LOGI("Initial view focused: %p", front_view->surface);
+            }
+            last_front_view = front_view;
+            focus_sent = true;
+        }
         if (focus_log_count++ % 300 == 0) {
-            LOGI("Focus check: focused=%p kb=%p focus_sent=%d",
-                 server.seat.wlr_seat->keyboard_state.focused_surface, kb, focus_sent);
+            int view_count = 0;
+            wl_list_for_each(view, &server.views, link) {
+                view_count++;
+                if (view_count <= 3) {
+                    LOGI("  view[%d]: mapped=%d surface=%p maximized=%d",
+                         view_count, view->mapped, view->surface, view->maximized);
+                }
+            }
+            LOGI("Views: %d total, front=%p last_front=%p focus_sent=%d",
+                 view_count, front_view, last_front_view, focus_sent);
+        }
+    }
+
+    /* Deferred button press countdown — re-send motion with tiny
+     * jitter each frame to simulate hover, then inject the click.
+     * Clients like fuzzel ignore motion at the exact same position
+     * but need real movement to highlight list items. */
+    if (g_deferred_button_countdown > 0) {
+        g_deferred_button_countdown--;
+        if (g_deferred_button_countdown > 0) {
+            /* Nudge by ~0.3 logical pixels to trigger hover */
+            double jitter = (g_deferred_button_countdown & 1) ? 0.001 : -0.001;
+            queue_input((struct input_event){
+                .type = INPUT_MOTION,
+                .x = g_deferred_motion_x + jitter,
+                .y = g_deferred_motion_y + jitter });
+        } else {
+            /* Final motion at exact position, then click */
+            queue_input((struct input_event){
+                .type = INPUT_MOTION,
+                .x = g_deferred_motion_x, .y = g_deferred_motion_y });
+            queue_input(g_deferred_button);
         }
     }
 
@@ -526,6 +578,7 @@ static void *compositor_main(void *arg) {
     /* Reset state from any previous compositor run */
     focus_sent = false;
     focus_log_count = 0;
+    last_front_view = NULL;
     g_input_read = 0;
     g_input_write = 0;
 
@@ -760,8 +813,14 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSendTouch(
     } else if (action == 0) { /* DOWN */
         queue_input((struct input_event){
             .type = INPUT_MOTION, .x = x, .y = y });
-        queue_input((struct input_event){
-            .type = INPUT_BUTTON, .code = 0x110, .pressed = 1 }); /* BTN_LEFT */
+        /* Defer button press by 3 frames (~100ms) so the client
+         * processes pointer_enter + motion (hover) first.  Re-send
+         * motion each frame to reinforce hover state. */
+        g_deferred_button = (struct input_event){
+            .type = INPUT_BUTTON, .code = 0x110, .pressed = 1 };
+        g_deferred_motion_x = x;
+        g_deferred_motion_y = y;
+        g_deferred_button_countdown = 3;
     } else if (action == 1) { /* UP */
         /* Send motion to final position before releasing button.
          * Android ACTION_UP carries valid coordinates that may differ
