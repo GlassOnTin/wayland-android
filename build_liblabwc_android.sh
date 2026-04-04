@@ -20,10 +20,6 @@ export ABI="${ABI:-arm64-v8a}"
 
 echo "=== Building liblabwc_android.so for $ABI ==="
 
-# Step 1: Build all dependencies (wayland, wlroots, cairo, pango, etc.)
-bash "$SCRIPT_DIR/build-android.sh"
-
-# Step 2: Generate Android stubs for libinput/DRM symbols unused on Android
 # Auto-detect NDK: ANDROID_NDK_HOME > newest under ANDROID_HOME/ndk/ > newest under ANDROID_SDK_ROOT/ndk/
 if [ -z "${ANDROID_NDK_HOME:-}" ]; then
     SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -33,6 +29,7 @@ if [ -z "${ANDROID_NDK_HOME:-}" ]; then
     fi
 fi
 NDK="${ANDROID_NDK_HOME:?ANDROID_NDK_HOME must be set or an NDK must exist under ANDROID_HOME/ndk/}"
+export ANDROID_NDK_HOME="$NDK"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
 PREFIX="$SCRIPT_DIR/sysroot/$ABI"
 
@@ -46,6 +43,9 @@ fi
 
 CC="$TOOLCHAIN/bin/${TARGET}-clang"
 AR="$TOOLCHAIN/bin/llvm-ar"
+
+# Step 1: Build all dependencies (wayland, wlroots, cairo, pango, etc.)
+bash "$SCRIPT_DIR/build-android.sh"
 
 # Copy libinput.h from submodule (labwc includes it but we don't build libinput)
 cp "$SCRIPT_DIR/libinput/src/libinput.h" "$PREFIX/include/" 2>/dev/null || true
@@ -61,7 +61,22 @@ struct udev_device;
 UDEV
 fi
 
-# Generate and compile stubs
+# Step 2: Build labwc + wlroots (with GLES2 renderer)
+# Remove renderer-less wlroots from step 1 so build-labwc.sh rebuilds with GLES2
+rm -f "$PREFIX/lib/libwlroots-0.19.a"
+rm -rf "$SCRIPT_DIR/build/$ABI/wlroots"
+
+# Create a minimal stubs library so labwc can link for the first pass
+echo '/* minimal stubs */' > /tmp/android_stubs.c
+echo 'void *libinput_udev_create_context() { return 0; }' >> /tmp/android_stubs.c
+$CC -c /tmp/android_stubs.c -o /tmp/android_stubs.o -fPIC
+$AR rcs "$PREFIX/lib/libandroid_stubs.a" /tmp/android_stubs.o
+
+bash "$SCRIPT_DIR/build-labwc.sh" "$ABI"
+
+# Step 3: Generate stubs from built labwc (now that liblabwc.a exists)
+# Then rebuild the stubs library and relink
+echo "=== Generating stubs from built labwc ==="
 bash "$SCRIPT_DIR/gen-stubs.sh" > /tmp/android_stubs.c
 # Add xcb_ewmh stubs (m4 generation may produce empty library)
 cat >> /tmp/android_stubs.c << 'EWMH'
@@ -73,13 +88,10 @@ EWMH
 $CC -c /tmp/android_stubs.c -o /tmp/android_stubs.o -fPIC
 $AR rcs "$PREFIX/lib/libandroid_stubs.a" /tmp/android_stubs.o
 
-# Step 3: Build labwc + wlroots (with GLES2) + link final .so
-# Remove renderer-less wlroots from step 1 so build-labwc.sh rebuilds with GLES2
-rm -f "$PREFIX/lib/libwlroots-0.19.a"
-rm -rf "$SCRIPT_DIR/build/$ABI/wlroots"
+# Step 4: Relink final .so with correct stubs
 bash "$SCRIPT_DIR/build-labwc.sh" "$ABI"
 
-# Step 4: Output location
+# Step 5: Output location
 echo ""
 echo "=== Output: jniLibs/$ABI/liblabwc_android.so ==="
 ls -lh "$SCRIPT_DIR/jniLibs/$ABI/liblabwc_android.so"
