@@ -58,20 +58,6 @@ for hdr in drm.h wayland.h headless.h multi.h libinput.h session.h x11.h; do
     [ -f "$src" ] && cp "$src" "$SYSROOT/include/wlr/backend/"
 done
 
-if [ ! -f "$BUILDDIR/labwc/liblabwc.a" ]; then
-    echo "--- labwc (Meson) ---"
-    CROSSFILE="$BUILDDIR/cross.txt"
-    rm -rf "$BUILDDIR/labwc"
-    meson setup "$BUILDDIR/labwc" "$SCRIPT_DIR/labwc" \
-        --cross-file "$CROSSFILE" \
-        --prefix="$SYSROOT" \
-        --default-library=static \
-        -Dxwayland=enabled -Dsvg=disabled -Dicon=disabled \
-        -Dnls=disabled -Dman-pages=disabled \
-        -Db_pie=false
-    ninja -C "$BUILDDIR/labwc" -j"$(nproc)"
-fi
-
 # Create synthetic pkg-config files for EGL/GLES2
 mkdir -p "$SYSROOT/lib/pkgconfig"
 cat > "$SYSROOT/lib/pkgconfig/egl.pc" << EOF
@@ -114,6 +100,21 @@ if [ ! -f "$SYSROOT/lib/libwlroots-0.19.a" ]; then
         -Dxcb-errors=disabled -Dwerror=false
     ninja -C "$BUILDDIR/wlroots" -j"$(nproc)"
     ninja -C "$BUILDDIR/wlroots" install
+fi
+
+# Build labwc AFTER wlroots is installed (labnag links against libwlroots-0.19)
+if [ ! -f "$BUILDDIR/labwc/liblabwc.a" ]; then
+    echo "--- labwc (Meson) ---"
+    CROSSFILE="$BUILDDIR/cross.txt"
+    rm -rf "$BUILDDIR/labwc"
+    meson setup "$BUILDDIR/labwc" "$SCRIPT_DIR/labwc" \
+        --cross-file "$CROSSFILE" \
+        --prefix="$SYSROOT" \
+        --default-library=static \
+        -Dxwayland=enabled -Dsvg=disabled -Dicon=disabled \
+        -Dnls=disabled -Dman-pages=disabled \
+        -Db_pie=false
+    ninja -C "$BUILDDIR/labwc" -j"$(nproc)"
 fi
 
 echo "--- Compiling JNI bridge + allocator + presenter ---"
