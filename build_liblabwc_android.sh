@@ -78,14 +78,16 @@ bash "$SCRIPT_DIR/build-labwc.sh" "$ABI"
 # Then rebuild the stubs library and relink
 echo "=== Generating stubs from built labwc ==="
 bash "$SCRIPT_DIR/gen-stubs.sh" > /tmp/android_stubs.c
-# Add xcb_ewmh stubs only if not already defined in sysroot
-# (clean builds with working m4 produce a real libxcb-ewmh.a)
+# Add xcb_ewmh stubs only if libxcb-ewmh.a doesn't provide them.
+# Clean builds with working m4 produce a real libxcb-ewmh.a; only
+# broken local builds (missing m4 macros) need the stubs.
 NM="$TOOLCHAIN/bin/llvm-nm"
-SYSROOT_DEFINED=$( $NM --defined-only "$PREFIX/lib/"*.a 2>/dev/null | awk '{print $3}' | sort -u )
+EWMH_LIB="$PREFIX/lib/libxcb-ewmh.a"
 for sym in xcb_ewmh_get_wm_icon_from_reply xcb_ewmh_get_wm_icon_iterator \
            xcb_ewmh_get_wm_icon_next xcb_ewmh_get_wm_strut_partial_from_reply; do
-    if ! echo "$SYSROOT_DEFINED" | grep -qx "$sym"; then
+    if [ ! -f "$EWMH_LIB" ] || ! $NM --defined-only "$EWMH_LIB" 2>/dev/null | grep -q " $sym\$"; then
         echo "void *${sym}() { return 0; }" >> /tmp/android_stubs.c
+        echo "  stub: $sym"
     fi
 done
 $CC -c /tmp/android_stubs.c -o /tmp/android_stubs.o -fPIC
