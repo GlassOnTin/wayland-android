@@ -289,8 +289,19 @@ static volatile int g_force_redraw = 0;
 static volatile int g_pending_view_w = 0;
 static volatile int g_pending_view_h = 0;
 
-/* Fixed Wayland output scale (integer, for protocol compliance) */
-#define WAYLAND_SCALE 3
+/* Wayland output scale reported to clients.
+ * We use scale=1 so layer-shell clients (waybar, etc.) render 1:1 into
+ * their buffers, avoiding the visual-vs-input offset that occurred when
+ * clients mishandled the 3x scale factor.
+ * The compositor renders at logical resolution (physical / DPI_SCALE);
+ * Android's TextureView upscales the smaller buffer to fill the display. */
+#define WAYLAND_SCALE 1
+
+/* Physical-to-logical density factor.  Matches the Android display density
+ * (e.g. 3 for a ~480 dpi "xxhdpi" screen).  The compositor's output mode
+ * is set to physical_pixels / DPI_SCALE so that UI elements appear at
+ * a comfortable size for mobile. */
+#define DPI_SCALE 3
 
 /* Maximum surface dimensions seen */
 static int g_max_surface_w = 0;
@@ -352,8 +363,8 @@ static int frame_timer_cb(void *data) {
                 LOGE("Output commit failed for %dx%d", rw, rh);
             }
             wlr_output_state_finish(&ostate);
-            LOGI("Output %dx%d scale=%d (logical %dx%d)",
-                 rw, rh, WAYLAND_SCALE, rw/WAYLAND_SCALE, rh/WAYLAND_SCALE);
+            LOGI("Output %dx%d scale=%d (DPI_SCALE=%d)",
+                 rw, rh, WAYLAND_SCALE, DPI_SCALE);
             break;
         }
     }
@@ -472,8 +483,9 @@ static int frame_timer_cb(void *data) {
             wlr_seat_pointer_notify_frame(server.seat.wlr_seat);
             static int motion_log = 0;
             if (motion_log++ % 5 == 0)
-                LOGI("Pointer: %.3f,%.3f → cursor %d,%d focus=%p",
+                LOGI("Pointer: %.3f,%.3f → cursor %d,%d sx=%.1f,sy=%.1f focus=%p",
                      ev.x, ev.y, (int)server.seat.cursor->x, (int)server.seat.cursor->y,
+                     sx, sy,
                      server.seat.wlr_seat->pointer_state.focused_surface);
             break;
         }
@@ -489,6 +501,12 @@ static int frame_timer_cb(void *data) {
                 notify = cursor_process_button_release(&server.seat,
                     ev.code, now);
             }
+            LOGI("Button %s at cursor %d,%d → notify=%d focus=%p pressed_focus=%p",
+                 ev.pressed ? "PRESS" : "RELEASE",
+                 (int)server.seat.cursor->x, (int)server.seat.cursor->y,
+                 notify,
+                 server.seat.wlr_seat->pointer_state.focused_surface,
+                 server.seat.pressed.ctx.surface);
             if (notify) {
                 wlr_seat_pointer_notify_button(server.seat.wlr_seat,
                     now, ev.code, ev.pressed ? WL_POINTER_BUTTON_STATE_PRESSED
@@ -699,6 +717,10 @@ static void *compositor_main(void *arg) {
     wl_display_run(server.wl_display);
 
     LOGI("Compositor shutting down");
+    /* Remove our commit listener before server_finish destroys
+     * the output — wlroots asserts that no listeners remain. */
+    wl_list_remove(&output_commit_listener.link);
+    wl_list_init(&output_commit_listener.link);
     session_shutdown();
     rcxml_finish();
     font_finish();
@@ -822,6 +844,16 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSendTouch(
         g_deferred_motion_y = y;
         g_deferred_button_countdown = 3;
     } else if (action == 1) { /* UP */
+        /* If the deferred press hasn't fired yet (quick tap), flush
+         * it now so the press arrives before the release.  Without
+         * this, RELEASE precedes PRESS and clients like fuzzel see
+         * a highlight (press) that never activates (missing release). */
+        if (g_deferred_button_countdown > 0) {
+            g_deferred_button_countdown = 0;
+            queue_input((struct input_event){
+                .type = INPUT_MOTION, .x = x, .y = y });
+            queue_input(g_deferred_button);
+        }
         /* Send motion to final position before releasing button.
          * Android ACTION_UP carries valid coordinates that may differ
          * from the last MOVE — without this, drags end at the wrong
@@ -856,8 +888,8 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeResize(
     JNIEnv *env, jclass cls, jint width, jint height)
 {
     (void)env; (void)cls;
-    g_pending_view_w = width / WAYLAND_SCALE;
-    g_pending_view_h = height / WAYLAND_SCALE;
+    g_pending_view_w = width / DPI_SCALE;
+    g_pending_view_h = height / DPI_SCALE;
 }
 
 JNIEXPORT void JNICALL
@@ -918,26 +950,35 @@ Java_sh_haven_core_wayland_WaylandBridge_nativeSetSurface(JNIEnv *env, jclass cl
     if (surface) {
         g_window = ANativeWindow_fromSurface(env, surface);
         if (g_window) {
-            int sw = ANativeWindow_getWidth(g_window);
-            int sh = ANativeWindow_getHeight(g_window);
-            LOGI("Surface set: %dx%d", sw, sh);
+            int phys_w = ANativeWindow_getWidth(g_window);
+            int phys_h = ANativeWindow_getHeight(g_window);
+            LOGI("Surface physical: %dx%d", phys_w, phys_h);
+
+            /* Compute logical resolution for the compositor.
+             * The compositor renders at this size; Android upscales.
+             * Buffer stays portrait (matching the TextureView) so pixels
+             * remain square.  A 90° output transform makes clients see
+             * landscape dimensions — standard desktop monitor layout. */
+            int sw = phys_w / DPI_SCALE;
+            int sh = phys_h / DPI_SCALE;
+            if (sw < 100) sw = phys_w;
+            if (sh < 100) sh = phys_h;
+
+            /* Set the ANativeWindow buffer geometry to the logical
+             * resolution.  The TextureView stretches this to fill
+             * the physical display automatically. */
+            ANativeWindow_setBuffersGeometry(g_window, sw, sh,
+                AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM);
 
             /* Try zero-copy presenter (API 29+) */
             g_presenter = buffer_presenter_create(g_window);
 
-            if (!g_presenter) {
-                /* Fallback: set pixel format for CPU blit path */
-                ANativeWindow_setBuffersGeometry(g_window, 0, 0,
-                    AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM);
-            }
-
-            sw = ANativeWindow_getWidth(g_window);
-            sh = ANativeWindow_getHeight(g_window);
             g_max_surface_w = sw;
             g_max_surface_h = sh;
             g_pending_resize_w = sw;
             g_pending_resize_h = sh;
-            LOGI("Surface set: %dx%d (presenter=%s)", sw, sh,
+            LOGI("Surface set: %dx%d logical (physical %dx%d, DPI_SCALE=%d, presenter=%s)",
+                 sw, sh, phys_w, phys_h, DPI_SCALE,
                  g_presenter ? "zero-copy" : "CPU blit");
 
             /* Re-blit cached frame immediately so the surface isn't black */
