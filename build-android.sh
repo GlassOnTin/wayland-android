@@ -308,6 +308,18 @@ build_freetype_pass2() {
 
 # ---- cairo (Meson) ----
 build_cairo() {
+    # Workaround: replace cairo's FT_LOAD_NO_SVG has_define probe with a
+    # freetype version check. The has_define probe fails on the F-Droid
+    # buildserver for x86_64 cross-compile (works locally, works for arm64 on
+    # the same server), and its "failed to compile test" path escalates to
+    # a hard meson error instead of returning false. FT_LOAD_NO_SVG was
+    # introduced in freetype 2.13.1 (pkg-config libtool version 25.2.1), so
+    # a version gate is equivalent behaviour. Idempotent — no-op if already
+    # patched.
+    local cairo_meson="$SCRIPT_DIR/cairo/meson.build"
+    if grep -q "cc.has_define('FT_LOAD_NO_SVG'" "$cairo_meson"; then
+        sed -i "s|if cc.has_define('FT_LOAD_NO_SVG', dependencies: freetype_dep, prefix: '#include <freetype/freetype.h>')|if freetype_dep.version().version_compare('>= 25.2.1')|" "$cairo_meson"
+    fi
     meson_android cairo "$SCRIPT_DIR/cairo" \
         -Dtests=disabled -Dspectre=disabled -Dtee=disabled \
         -Dxcb=disabled -Dxlib=disabled -Dquartz=disabled \
