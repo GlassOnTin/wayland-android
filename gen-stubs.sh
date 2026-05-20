@@ -37,6 +37,8 @@ echo '/* Auto-generated Android stubs */'
 echo '#include <stdbool.h>'
 echo '#include <stddef.h>'
 echo ''
+# Weak so a real implementation in any sysroot archive overrides the stub at
+# link time without a duplicate-symbol error; the stub is only a fallback.
 while IFS= read -r sym; do
-    echo "void *${sym}() { return 0; }"
+    echo "__attribute__((weak)) void *${sym}(void) { return 0; }"
 done < "$TMPDIR/need.txt"

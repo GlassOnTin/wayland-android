@@ -66,9 +66,12 @@ fi
 rm -f "$PREFIX/lib/libwlroots-0.19.a"
 rm -rf "$SCRIPT_DIR/build/$ABI/wlroots"
 
-# Create a minimal stubs library so labwc can link for the first pass
+# Create a minimal stubs library so labwc can link for the first pass.
+# Stubs are weak so any real implementation in the sysroot archives wins at
+# link time (a strong def always overrides a weak one with no duplicate-symbol
+# error); the weak stub is only used as a fallback when the symbol is absent.
 echo '/* minimal stubs */' > /tmp/android_stubs.c
-echo 'void *libinput_udev_create_context() { return 0; }' >> /tmp/android_stubs.c
+echo '__attribute__((weak)) void *libinput_udev_create_context() { return 0; }' >> /tmp/android_stubs.c
 $CC -c /tmp/android_stubs.c -o /tmp/android_stubs.o -fPIC
 $AR rcs "$PREFIX/lib/libandroid_stubs.a" /tmp/android_stubs.o
 
@@ -78,17 +81,14 @@ bash "$SCRIPT_DIR/build-labwc.sh" "$ABI"
 # Then rebuild the stubs library and relink
 echo "=== Generating stubs from built labwc ==="
 bash "$SCRIPT_DIR/gen-stubs.sh" > /tmp/android_stubs.c
-# Add xcb_ewmh stubs only if libxcb-ewmh.a doesn't provide them.
-# Clean builds with working m4 produce a real libxcb-ewmh.a; only
-# broken local builds (missing m4 macros) need the stubs.
-NM="$TOOLCHAIN/bin/llvm-nm"
-EWMH_LIB="$PREFIX/lib/libxcb-ewmh.a"
+# xcb_ewmh fallbacks, emitted as WEAK so the real implementations in
+# libxcb-ewmh.a (clean builds with working m4) always win at link time, while
+# broken local builds (empty libxcb-ewmh.a from missing m4 macros) fall back to
+# the weak stub. Weak avoids the duplicate-symbol error a strong stub caused
+# when libxcb-ewmh.a was real but a detection guard still added the stub.
 for sym in xcb_ewmh_get_wm_icon_from_reply xcb_ewmh_get_wm_icon_iterator \
            xcb_ewmh_get_wm_icon_next xcb_ewmh_get_wm_strut_partial_from_reply; do
-    if [ ! -f "$EWMH_LIB" ] || ! $NM --defined-only "$EWMH_LIB" 2>/dev/null | grep -q " $sym\$"; then
-        echo "void *${sym}() { return 0; }" >> /tmp/android_stubs.c
-        echo "  stub: $sym"
-    fi
+    echo "__attribute__((weak)) void *${sym}(void) { return 0; }" >> /tmp/android_stubs.c
 done
 $CC -c /tmp/android_stubs.c -o /tmp/android_stubs.o -fPIC
 $AR rcs "$PREFIX/lib/libandroid_stubs.a" /tmp/android_stubs.o
