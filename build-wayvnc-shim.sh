@@ -39,7 +39,13 @@ build_one() {
     local out="$out_dir/libhaven_wayvnc_shim.so"
     mkdir -p "$out_dir"
     echo "=== Building wayvnc shim for $abi ==="
-    "$cc" -shared -fPIC -O2 -Wall -Wextra -o "$out" "$SRC"
+    # _FORTIFY_SOURCE (on by default at -O2 with Debian's cross-gcc) rewrites
+    # fprintf() to __fprintf_chk, a glibc-only symbol. The shim is LD_PRELOADed
+    # inside every distro's rootfs, including Alpine (musl), where __fprintf_chk
+    # doesn't exist — the relocation fails and the shim's wlr-screencopy
+    # interposition is lost (grey screen on Alpine, #162). Disable fortify so
+    # the .so depends only on plain libc symbols present on musl and glibc.
+    "$cc" -shared -fPIC -O2 -D_FORTIFY_SOURCE=0 -Wall -Wextra -o "$out" "$SRC"
     case "$abi" in
         arm64-v8a) command -v aarch64-linux-gnu-strip >/dev/null && aarch64-linux-gnu-strip "$out" || true ;;
         x86_64) command -v x86_64-linux-gnu-strip >/dev/null && x86_64-linux-gnu-strip "$out" || true ;;
