@@ -12,7 +12,7 @@
 	url = https://gitlab.freedesktop.org/cairo/cairo.git
 [submodule "pango"]
 	path = pango
-	url = https://gitlab.gnome.org/GNOME/pango.git
+	url = https://github.com/GNOME/pango.git
 [submodule "harfbuzz"]
 	path = harfbuzz
 	url = https://github.com/harfbuzz/harfbuzz.git
@@ -24,7 +24,7 @@
 	url = https://gitlab.freedesktop.org/fontconfig/fontconfig.git
 [submodule "glib"]
 	path = glib
-	url = https://gitlab.gnome.org/GNOME/glib.git
+	url = https://github.com/GNOME/glib.git
 [submodule "fribidi"]
 	path = fribidi
 	url = https://github.com/fribidi/fribidi.git
@@ -39,7 +39,7 @@
 	url = https://github.com/libexpat/libexpat.git
 [submodule "libxml2"]
 	path = libxml2
-	url = https://gitlab.gnome.org/GNOME/libxml2.git
+	url = https://github.com/GNOME/libxml2.git
 [submodule "libffi"]
 	path = libffi
 	url = https://github.com/libffi/libffi.git
