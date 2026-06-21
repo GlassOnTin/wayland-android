@@ -50,6 +50,20 @@ build_one() {
         arm64-v8a) command -v aarch64-linux-gnu-strip >/dev/null && aarch64-linux-gnu-strip "$out" || true ;;
         x86_64) command -v x86_64-linux-gnu-strip >/dev/null && x86_64-linux-gnu-strip "$out" || true ;;
     esac
+    # Guard against the #246 regression: building on a glibc >= 2.34 host
+    # stamps dlsym@GLIBC_2.34 into the .so unless the source pins it (it
+    # does, via .symver). An unsatisfiable GLIBC_2.34 makes ld.so drop the
+    # LD_PRELOAD on older-glibc targets (Void) with a misleading "cannot
+    # open shared object file". Fail loudly here rather than ship a shim
+    # that silently won't preload. (readelf is optional tooling; skip the
+    # check if it's absent rather than fail the build on dev boxes.)
+    if command -v readelf >/dev/null 2>&1; then
+        if readelf -V "$out" | grep -qE "GLIBC_2\.(3[4-9]|[4-9][0-9])"; then
+            echo "ERROR: $abi shim requires GLIBC_2.34+ — dlsym .symver pin missing? (#246)" >&2
+            readelf -V "$out" | grep -iE "Name: GLIBC" | sort -u >&2
+            exit 1
+        fi
+    fi
     ls -la "$out"
 }
 

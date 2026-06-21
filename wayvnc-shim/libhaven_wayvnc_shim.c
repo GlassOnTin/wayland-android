@@ -24,6 +24,9 @@
  *     Arch / Alpine / Debian glibc cannot resolve.
  *   - aarch64: aarch64-linux-gnu-gcc
  *   - x86_64:  x86_64-linux-gnu-gcc
+ *   - Use build.sh, which pins the glibc baseline (see below) and
+ *     verifies the result. Building by hand on a modern host reintroduces
+ *     the #246 GLIBC_2.34 dependency.
  *
  * Loaded by the proot launch script via:
  *   LD_PRELOAD=/usr/local/lib/haven/libhaven_wayvnc_shim.so
@@ -35,6 +38,24 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+/*
+ * Pin dlsym to the per-arch glibc baseline so the shim loads on older
+ * glibc. glibc merged libdl into libc at 2.34, versioning dlsym as
+ * dlsym@GLIBC_2.34; building on a host with glibc >= 2.34 therefore
+ * stamps that requirement into the .so. On a target whose preload-time
+ * libc can't satisfy GLIBC_2.34, ld.so drops the LD_PRELOAD with a
+ * misleading "cannot open shared object file" and wayvnc falls back to
+ * the ext-image-copy-capture path that grey-screens on the wlroots
+ * headless backend (#246, observed on Void). dlsym is the only symbol
+ * the shim pulls in above the baseline, so pinning it keeps the .so at
+ * NEEDED libc.so.6 only with no GLIBC_2.34.
+ */
+#if defined(__aarch64__)
+__asm__(".symver dlsym, dlsym@GLIBC_2.17");
+#elif defined(__x86_64__)
+__asm__(".symver dlsym, dlsym@GLIBC_2.2.5");
+#endif
 
 struct wl_proxy;
 struct wl_object;
