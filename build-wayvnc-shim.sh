@@ -27,12 +27,14 @@ build_one() {
     local abi="$1"
     local cc
     case "$abi" in
-        arm64-v8a) cc="aarch64-linux-gnu-gcc" ;;
-        x86_64)    cc="x86_64-linux-gnu-gcc" ;;
+        arm64-v8a)   cc="aarch64-linux-gnu-gcc" ;;
+        x86_64)      cc="x86_64-linux-gnu-gcc" ;;
+        # 32-bit ARM guests link against armhf glibc (Debian/Alpine armv7).
+        armeabi-v7a) cc="arm-linux-gnueabihf-gcc" ;;
         *) echo "unsupported ABI: $abi" >&2; exit 1 ;;
     esac
     command -v "$cc" >/dev/null 2>&1 || {
-        echo "$cc not found — install gcc-aarch64-linux-gnu / gcc-x86-64-linux-gnu" >&2
+        echo "$cc not found — install gcc-aarch64-linux-gnu / gcc-x86-64-linux-gnu / gcc-arm-linux-gnueabihf" >&2
         exit 1
     }
     local out_dir="$ASSET_ROOT/$abi"
@@ -49,6 +51,7 @@ build_one() {
     case "$abi" in
         arm64-v8a) command -v aarch64-linux-gnu-strip >/dev/null && aarch64-linux-gnu-strip "$out" || true ;;
         x86_64) command -v x86_64-linux-gnu-strip >/dev/null && x86_64-linux-gnu-strip "$out" || true ;;
+        armeabi-v7a) command -v arm-linux-gnueabihf-strip >/dev/null && arm-linux-gnueabihf-strip "$out" || true ;;
     esac
     # Guard against the #246 regression: building on a glibc >= 2.34 host
     # stamps dlsym@GLIBC_2.34 into the .so unless the source pins it (it
@@ -70,6 +73,7 @@ build_one() {
 if [ $# -eq 0 ]; then
     build_one arm64-v8a
     build_one x86_64
+    build_one armeabi-v7a
 else
     build_one "$1"
 fi

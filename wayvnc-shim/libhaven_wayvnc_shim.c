@@ -55,6 +55,9 @@
 __asm__(".symver dlsym, dlsym@GLIBC_2.17");
 #elif defined(__x86_64__)
 __asm__(".symver dlsym, dlsym@GLIBC_2.2.5");
+#elif defined(__arm__)
+/* 32-bit ARM (armhf): dlsym's baseline is the armhf port's first release. */
+__asm__(".symver dlsym, dlsym@GLIBC_2.4");
 #endif
 
 struct wl_proxy;
