@@ -6,7 +6,11 @@ set -euo pipefail
 #
 # Prerequisites (F-Droid sudo block):
 #   apt-get install -y meson ninja-build pkg-config libexpat1-dev libffi-dev \
-#       automake autoconf libtool libtool-bin libwayland-dev python3 bison g++
+#       automake autoconf libtool libtool-bin python3 bison g++
+#
+# libwayland-dev is deliberately NOT required: wayland-scanner is built here from
+# the vendored wayland tree (see build_wayland_scanner_native), because the host's
+# copy has to match our tree's version exactly and the build image's does not.
 #
 # Environment:
 #   ANDROID_NDK_HOME — path to NDK r28+
@@ -47,6 +51,11 @@ STRIP="$TOOLCHAIN/bin/llvm-strip"
 
 PREFIX="$SCRIPT_DIR/sysroot/$ABI"
 BUILDDIR="$SCRIPT_DIR/build/$ABI"
+# Build-machine prefix: holds wayland-scanner, which has to RUN on the builder
+# rather than the phone, so it can't come out of the cross build.
+NATIVE_PREFIX="$SCRIPT_DIR/sysroot/native"
+NATIVE_SCANNER="$NATIVE_PREFIX/bin/wayland-scanner"
+NATIVE_PKGCONFIG="$NATIVE_PREFIX/lib/pkgconfig:$NATIVE_PREFIX/share/pkgconfig"
 mkdir -p "$PREFIX"/{lib/pkgconfig,share/pkgconfig,include} "$BUILDDIR"
 
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
@@ -75,7 +84,7 @@ ar = '$AR'
 strip = '$STRIP'
 ranlib = '$RANLIB'
 pkg-config = '/usr/bin/pkg-config'
-wayland-scanner = '/usr/bin/wayland-scanner'
+wayland-scanner = '$NATIVE_SCANNER'
 
 [built-in options]
 c_args = ['-I$PREFIX/include', '-fPIC']
@@ -127,13 +136,41 @@ build_expat() {
     cmake --install "$BUILDDIR/expat"
 }
 
+# ---- wayland-scanner, for the BUILD machine (Meson) ----
+#
+# The cross build needs a wayland-scanner that runs on the builder, and
+# wayland/src/meson.build insists it be EXACTLY the version of the tree being
+# built (`version: meson.project_version()`). Borrowing the host's binary ties
+# us to whatever libwayland-dev the build image happens to ship: F-Droid's
+# buildserver moved to wayland-scanner 1.25.0 while we vendor 1.24.0, and the
+# whole build died at configure time — "Invalid version, need ['1.24.0'] found
+# '1.25.0'" — before a single file compiled.
+#
+# So build the scanner from OUR tree. It matches by construction, and the build
+# no longer cares what the image ships.
+build_wayland_scanner_native() {
+    echo "--- wayland-scanner (build machine) ---"
+    rm -rf "$BUILDDIR/wayland-native"
+    # Native build: clear the Android sysroot pkg-config vars so meson finds the
+    # host's expat (the scanner's only dependency), not the cross one.
+    env -u PKG_CONFIG_PATH -u PKG_CONFIG_LIBDIR \
+    meson setup "$BUILDDIR/wayland-native" "$SCRIPT_DIR/wayland" \
+        --prefix="$NATIVE_PREFIX" \
+        -Dlibraries=false -Dscanner=true \
+        -Ddocumentation=false -Dtests=false -Ddtd_validation=false
+    ninja -C "$BUILDDIR/wayland-native" -j"$(nproc)"
+    ninja -C "$BUILDDIR/wayland-native" install
+    "$NATIVE_SCANNER" --version
+}
+
 # ---- wayland (Meson) ----
 build_wayland() {
     echo "--- wayland ---"
     rm -rf "$BUILDDIR/wayland"
-    # Temporarily restore system PKG_CONFIG so meson finds host wayland-scanner
-    PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
-    PKG_CONFIG_LIBDIR="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
+    # Our scanner first on the native pkg-config path, so the version check in
+    # wayland/src/meson.build resolves against the tree we're building.
+    PKG_CONFIG_PATH="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
+    PKG_CONFIG_LIBDIR="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
     meson setup "$BUILDDIR/wayland" "$SCRIPT_DIR/wayland" \
         --cross-file "$CROSSFILE" \
         --prefix="$PREFIX" \
@@ -141,23 +178,15 @@ build_wayland() {
         -Ddocumentation=false -Dtests=false -Ddtd_validation=false -Dscanner=false
     ninja -C "$BUILDDIR/wayland" -j"$(nproc)"
     ninja -C "$BUILDDIR/wayland" install
-    # Create a wayland-scanner.pc pointing to the host binary (since we skipped building the scanner)
-    cat > "$PREFIX/lib/pkgconfig/wayland-scanner.pc" <<SCANNERPC
-prefix=/usr
-wayland_scanner=/usr/bin/wayland-scanner
-Name: Wayland Scanner
-Description: Wayland protocol scanner
-Version: 1.24.0
-SCANNERPC
 }
 
 # ---- wayland-protocols (Meson, header-only install) ----
 build_wayland_protocols() {
     echo "--- wayland-protocols ---"
     rm -rf "$BUILDDIR/wayland-protocols"
-    # Override wayland_scanner to use the HOST binary, not the cross-compiled one
-    PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
-    PKG_CONFIG_LIBDIR="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
+    # Same: our scanner, not the host's.
+    PKG_CONFIG_PATH="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
+    PKG_CONFIG_LIBDIR="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
     meson setup "$BUILDDIR/wayland-protocols" "$SCRIPT_DIR/wayland-protocols" \
         --cross-file "$CROSSFILE" \
         --prefix="$PREFIX" \
@@ -460,6 +489,7 @@ M4EOF
 # Execute all builds
 build_libffi
 build_expat
+build_wayland_scanner_native
 build_wayland
 build_wayland_protocols
 build_pixman
