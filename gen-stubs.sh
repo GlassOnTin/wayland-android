@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+# Symbol lists are compared with `comm`, which demands its inputs be ordered the
+# same way it orders them. Under a UTF-8 collation `sort` and `comm` disagree and
+# `comm` bails with "file 2 is not in sorted order" (exit 1), killing the build for
+# anyone whose locale is not C. Byte order is what symbol names want anyway.
+export LC_ALL=C
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ABI="${ABI:-arm64-v8a}"
 
