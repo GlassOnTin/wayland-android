@@ -35,6 +35,15 @@ SYSROOT="$SCRIPT_DIR/sysroot/$ABI"
 BUILDDIR="$SCRIPT_DIR/build/$ABI"
 NDK_SYSROOT="$TOOLCHAIN/sysroot"
 
+# wlroots/protocol/meson.build resolves the scanner with
+#   dependency('wayland-scanner', native: true)
+# — a BUILD-machine lookup, which Meson takes from the *_FOR_BUILD pkg-config vars;
+# plain PKG_CONFIG_PATH addresses the host machine. Point it at the scanner
+# build-android.sh built from our vendored tree, otherwise the lookup falls through
+# to whatever the build image happens to ship — which on F-Droid is nothing at all.
+NATIVE_PREFIX="$SCRIPT_DIR/sysroot/native"
+export PKG_CONFIG_PATH_FOR_BUILD="$NATIVE_PREFIX/lib/pkgconfig:$NATIVE_PREFIX/share/pkgconfig"
+
 echo "=== Building labwc for $ABI ==="
 
 # Build labwc if not already built
