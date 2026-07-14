@@ -153,9 +153,12 @@ build_wayland_scanner_native() {
     rm -rf "$BUILDDIR/wayland-native"
     # Native build: clear the Android sysroot pkg-config vars so meson finds the
     # host's expat (the scanner's only dependency), not the cross one.
+    # --libdir=lib pins where wayland-scanner.pc lands. Meson's default libdir is
+    # distro-dependent — lib/x86_64-linux-gnu on Debian, lib64 on the F-Droid image —
+    # and NATIVE_PKGCONFIG has to name that directory exactly.
     env -u PKG_CONFIG_PATH -u PKG_CONFIG_LIBDIR \
     meson setup "$BUILDDIR/wayland-native" "$SCRIPT_DIR/wayland" \
-        --prefix="$NATIVE_PREFIX" \
+        --prefix="$NATIVE_PREFIX" --libdir=lib \
         -Dlibraries=false -Dscanner=true \
         -Ddocumentation=false -Dtests=false -Ddtd_validation=false
     ninja -C "$BUILDDIR/wayland-native" -j"$(nproc)"
@@ -167,10 +170,14 @@ build_wayland_scanner_native() {
 build_wayland() {
     echo "--- wayland ---"
     rm -rf "$BUILDDIR/wayland"
-    # Our scanner first on the native pkg-config path, so the version check in
-    # wayland/src/meson.build resolves against the tree we're building.
-    PKG_CONFIG_PATH="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
-    PKG_CONFIG_LIBDIR="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
+    # wayland/src/meson.build resolves the scanner with
+    #   dependency('wayland-scanner', native: true, version: meson.project_version())
+    # — a BUILD-machine lookup, which Meson configures from the *_FOR_BUILD
+    # pkg-config vars. Plain PKG_CONFIG_PATH addresses the HOST machine in a cross
+    # build, so it never steered this lookup: it fell through to the image's system
+    # dirs. That is how F-Droid's 1.25.0 libwayland-dev came to answer it — and why,
+    # once that package was dropped, the build found no scanner at all.
+    PKG_CONFIG_PATH_FOR_BUILD="$NATIVE_PKGCONFIG" \
     meson setup "$BUILDDIR/wayland" "$SCRIPT_DIR/wayland" \
         --cross-file "$CROSSFILE" \
         --prefix="$PREFIX" \
@@ -184,9 +191,8 @@ build_wayland() {
 build_wayland_protocols() {
     echo "--- wayland-protocols ---"
     rm -rf "$BUILDDIR/wayland-protocols"
-    # Same: our scanner, not the host's.
-    PKG_CONFIG_PATH="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
-    PKG_CONFIG_LIBDIR="$NATIVE_PKGCONFIG:$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig" \
+    # Same: our scanner on the BUILD machine's pkg-config path, not the image's.
+    PKG_CONFIG_PATH_FOR_BUILD="$NATIVE_PKGCONFIG" \
     meson setup "$BUILDDIR/wayland-protocols" "$SCRIPT_DIR/wayland-protocols" \
         --cross-file "$CROSSFILE" \
         --prefix="$PREFIX" \
