@@ -90,9 +90,21 @@ Libs: -L\${libdir} -lGLESv2
 Cflags: -I\${includedir}
 EOF
 
-# Stub gbm.h (Android has no GBM)
+# Stub gbm.h (Android has no GBM). The stub is a tracked 13-line header that
+# only provides the types wlroots' egl.c needs to compile — the GBM paths are
+# never reached, since we go through wlr_egl_create_with_context.
+#
+# Fails loudly on purpose. This used to be `2>/dev/null || true`, so a missing
+# stub produced no error here and instead surfaced ~3000 lines later as
+# "fatal error: 'gbm.h' file not found" inside wlroots, which reads as the
+# wayland build being unreproducible rather than as one absent header.
+GBM_STUB="$SCRIPT_DIR/sysroot/arm64-v8a/include/gbm.h"
+if [ ! -f "$GBM_STUB" ]; then
+    echo "ERROR: missing tracked stub $GBM_STUB — wlroots will not compile without it" >&2
+    exit 1
+fi
 mkdir -p "$SYSROOT/include"
-cp "$SCRIPT_DIR/sysroot/arm64-v8a/include/gbm.h" "$SYSROOT/include/gbm.h" 2>/dev/null || true
+cp "$GBM_STUB" "$SYSROOT/include/gbm.h"
 
 # Build wlroots with GLES2 if not already built
 if [ ! -f "$SYSROOT/lib/libwlroots-0.19.a" ]; then
