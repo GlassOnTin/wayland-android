@@ -104,7 +104,12 @@ if [ ! -f "$GBM_STUB" ]; then
     exit 1
 fi
 mkdir -p "$SYSROOT/include"
-cp "$GBM_STUB" "$SYSROOT/include/gbm.h"
+# For ABI=arm64-v8a the stub already IS the destination, and cp refuses to copy
+# a file onto itself. That case was previously hidden by `|| true`, so removing
+# it broke the arm64 build — the one path that matters most.
+if [ "$GBM_STUB" != "$SYSROOT/include/gbm.h" ]; then
+    cp "$GBM_STUB" "$SYSROOT/include/gbm.h"
+fi
 
 # Build wlroots with GLES2 if not already built
 if [ ! -f "$SYSROOT/lib/libwlroots-0.19.a" ]; then
