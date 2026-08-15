@@ -1,6 +1,6 @@
 [submodule "wayland"]
 	path = wayland
-	url = https://gitlab.freedesktop.org/wayland/wayland.git
+	url = https://github.com/GlassOnTin/wayland.git
 [submodule "wlroots"]
 	path = wlroots
 	url = https://github.com/GlassOnTin/wlroots.git
@@ -9,7 +9,7 @@
 	url = https://github.com/GlassOnTin/labwc.git
 [submodule "cairo"]
 	path = cairo
-	url = https://gitlab.freedesktop.org/cairo/cairo.git
+	url = https://github.com/GlassOnTin/cairo.git
 [submodule "pango"]
 	path = pango
 	url = https://github.com/GNOME/pango.git
@@ -18,10 +18,10 @@
 	url = https://github.com/harfbuzz/harfbuzz.git
 [submodule "freetype"]
 	path = freetype
-	url = https://gitlab.freedesktop.org/freetype/freetype.git
+	url = https://github.com/freetype/freetype.git
 [submodule "fontconfig"]
 	path = fontconfig
-	url = https://gitlab.freedesktop.org/fontconfig/fontconfig.git
+	url = https://github.com/GlassOnTin/fontconfig.git
 [submodule "glib"]
 	path = glib
 	url = https://github.com/GNOME/glib.git
@@ -30,10 +30,10 @@
 	url = https://github.com/fribidi/fribidi.git
 [submodule "pixman"]
 	path = pixman
-	url = https://gitlab.freedesktop.org/pixman/pixman.git
+	url = https://github.com/GlassOnTin/pixman.git
 [submodule "libdrm"]
 	path = libdrm
-	url = https://gitlab.freedesktop.org/mesa/drm.git
+	url = https://github.com/GlassOnTin/drm.git
 [submodule "libexpat"]
 	path = libexpat
 	url = https://github.com/libexpat/libexpat.git
@@ -54,13 +54,13 @@
 	url = https://github.com/xkbcommon/libxkbcommon.git
 [submodule "wayland-protocols"]
 	path = wayland-protocols
-	url = https://gitlab.freedesktop.org/wayland/wayland-protocols.git
+	url = https://github.com/GlassOnTin/wayland-protocols.git
 [submodule "libevdev"]
 	path = libevdev
-	url = https://gitlab.freedesktop.org/libevdev/libevdev.git
+	url = https://github.com/GlassOnTin/libevdev.git
 [submodule "libinput"]
 	path = libinput
-	url = https://gitlab.freedesktop.org/libinput/libinput.git
+	url = https://github.com/GlassOnTin/libinput.git
 [submodule "libepoxy"]
 	path = libepoxy
 	url = https://github.com/anholt/libepoxy.git
@@ -69,19 +69,19 @@
 	url = https://github.com/GlassOnTin/virglrenderer.git
 [submodule "xcb-proto"]
 	path = xcb-proto
-	url = https://gitlab.freedesktop.org/xorg/proto/xcbproto.git
+	url = https://github.com/GlassOnTin/xcbproto.git
 [submodule "libxcb"]
 	path = libxcb
-	url = https://gitlab.freedesktop.org/xorg/lib/libxcb.git
+	url = https://github.com/GlassOnTin/libxcb.git
 [submodule "libxau"]
 	path = libxau
-	url = https://gitlab.freedesktop.org/xorg/lib/libXau.git
+	url = https://github.com/GlassOnTin/libXau.git
 [submodule "libxdmcp"]
 	path = libxdmcp
-	url = https://gitlab.freedesktop.org/xorg/lib/libXdmcp.git
+	url = https://github.com/GlassOnTin/libXdmcp.git
 [submodule "xcb-util-wm"]
 	path = xcb-util-wm
-	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-wm.git
+	url = https://github.com/GlassOnTin/libxcb-wm.git
 [submodule "xorgproto"]
 	path = xorgproto
-	url = https://gitlab.freedesktop.org/xorg/proto/xorgproto.git
+	url = https://github.com/GlassOnTin/xorgproto.git
